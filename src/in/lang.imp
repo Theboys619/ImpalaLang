@@ -1,13 +1,15 @@
 $$$$ Btw dollar signs are comments $$$$
 
-number x = 5;
-
-number fact(number a) { $ Factorial function
-  if (floor(a) == 1) {
-    return 1;
+number test(string x) {
+  if (x == "Yes") {
+    log(x);
+  } else if (x == "Maybe") {
+    log("May", " be");
+  } else {
+    log("No");
   }
-
-  return floor(a) * fact(a-1);
 }
 
-log(fact(x));
+test("Yes");
+test("Maybe");
+test("Ok");

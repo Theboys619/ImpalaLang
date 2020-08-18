@@ -163,6 +163,8 @@ class Parser {
       }
       // const length = curInput ? curInput.length : 1; // Get the length of the input for advancing over
 
+      if (!curInput) new ImpalaError(`Unexpected token ${this.curTok.value}`, null, {});
+
       if (this.isDelim(curInput)) // Check if the input is a delimiter
         this.advance(length); // Then advance over all characters and repeat for every possible type
       else if (this.isKeyword(curInput))
@@ -173,7 +175,7 @@ class Parser {
         this.advance(length);
       else if (this.isIdentifier(curInput))
         this.advance(length);
-      else if (inputIndex > input.length)
+      else if (inputIndex > input.length) //|| typeof input != "object"
         new ImpalaError(`Unexpected token ${this.curTok.value}`, null, {}); // If it is never any type then throw an error
       else
         nextInput();
@@ -275,7 +277,11 @@ class Parser {
     if (this.isKeyword("else")) {
       this.skipOver("else");
 
-      ifStatement.value.else = new Scope(this.parseDelimiters("{", "}", [";", "\n"], this.pExpression));
+      if (this.isKeyword("if")) {
+        ifStatement.value.else = this.pIf();
+      } else {
+        ifStatement.value.else = new Scope(this.parseDelimiters("{", "}", [";", "\n"], this.pExpression));
+      }
     }
 
     return ifStatement;

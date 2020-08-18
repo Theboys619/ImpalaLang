@@ -9,7 +9,7 @@ any lol(bool variable) {
   }
 }
 
-int add(int x, int y) {
+number add(number x, number y) {
   return x + y;
 }
 

@@ -14,17 +14,17 @@ const DATA = { // Define grammar here
   whitespace: [" ", "\t"],
   linebreaks: ["\n"],
 
-  dataTypes: ["any", "string", "int", "bool"],
+  dataTypes: ["any", "string", "number", "bool"],
   keywords: ["true", "false", "return", "const", "for", "while", "do", "if", "else", "between", "and"],
 
   dataTypeAssign: {
     "any": ["String", "Number", "Boolean"],
     "string": "String",
-    "int": "Number",
+    "number": "Number",
     "bool": "Boolean"
   },
   TokTypetoDataType: {
-    "Number": "int",
+    "Number": "number",
     "String": "string",
     "Boolean": "bool"
   },
@@ -239,6 +239,8 @@ class Lexer {
         }
 
         if (this.char == ".") {
+          str += this.char;
+          this.advance();
           while (this.char != null && this.isNumber()) {
             str += this.char;
             this.advance();

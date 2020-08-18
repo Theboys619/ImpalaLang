@@ -117,14 +117,15 @@ class Interpreter {
       const returnValue = this.interpret(exp.value.scope, scope);
 
       if (typeof returnValue == "object") {
-        if (returnType.value !== this.ToktoData[returnValue.type]) {
-          new AssignmentError(this.createError(`Cannot return type '${this.ToktoData[returnValue.type]}' in function type '${returnType.value}'`, returnType.line, returnType.index))
+        if (returnType.value !== this.ToktoData[returnValue.returnType]) {
+          new AssignmentError(this.createError(`Cannot return type '${this.ToktoData[returnValue.returnType]}' in function type '${returnType.value}'`, returnType.line, returnType.index))
         }
         return returnValue;
       }
     }
     func.params = parameters;
-    func.returnType = returnType.value
+    func.returnType = returnType.returnType
+    func.env = env;
 
     env.define(exp.value.varname.value, func);
 
@@ -140,9 +141,16 @@ class Interpreter {
 
       case "Scope":
         var val = null;
+        var scopeReturned = false;
         exp.block.forEach(expr => {
-          val = this.interpret(expr, env);
-          // console.log(expr); // :LOG:
+          if (!scopeReturned) {
+            val = this.interpret(expr, env);
+            if (val && val.type == "Return") {
+              scopeReturned = true;
+              return val;
+            }
+          }
+          // if (expr && expr.type == "Return") return val;
         });
         return val;
 
@@ -225,13 +233,24 @@ class Interpreter {
 
         return func.apply(null, args);
 
+      case "If":
+        const ifCondition = this.interpret(exp.value.condition, env);
+        let ifReturn = false;
+
+        if (ifCondition.value) {
+          ifReturn = this.interpret(exp.value.then, env);
+        } else if (exp.value.else) {
+          ifReturn = this.interpret(exp.value.else, env);
+        }
+        return ifReturn;
+
       case "Return":
         // console.log("RETURN:\n"); // :LOG:
         // console.log(exp, env); // :LOG:
         const returnValue = this.interpret(exp.value, env);
         const returnType = (exp.value.type == "Binary") ? returnValue.type : (!exp.value.type) ? "Boolean" : exp.value.type;
 
-        return { type: returnType, value: returnValue.value };
+        return { type: "Return", returnType, value: returnValue.value };
     }
   }
 }

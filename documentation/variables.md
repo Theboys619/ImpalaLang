@@ -1,7 +1,7 @@
 ### Variables
 
 ```cpp
-int x = 45;
+number x = 45;
 string msg = "Hello there";
 bool boolean = true;
 any variable = "Anything can be here"; // Automatically assigns the type to the variable

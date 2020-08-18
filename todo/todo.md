@@ -11,15 +11,16 @@
     - Somewhat probably should fix a little bit
   - [ ]  Parse 'for loops'
   - [ ]  Parse 'while loops'
-  - [ ]  Parse 'if and else statements'
+  - [x]  Parse 'if and else statements'
 - [ ]  Interpret or Compile data from parser
   - [x]  Interpret 'basic math and expressions'
   - [x]  Interpret 'returns'
   - [x]  Interpret 'function calls'
-  - [ ]  Interpret 'if and else if conditions'
+  - [x]  Interpret 'if and else if conditions'
+    - else if is not interpreted or parsed yet
   - [x]  Interpret 'Scopes'
   - [x]  Interpret 'variable definitions'
-  - [ ]  Interpret 'variable reassignments'
+  - [x]  Interpret 'variable reassignments'
   - [ ]  Interpret 'while loops'
   - [ ]  Interpret 'for loops'
 

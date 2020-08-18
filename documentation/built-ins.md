@@ -40,3 +40,22 @@ log(helloString) $ -> "Hello World"
 ```
 
 You are now done! Your built in function should now be working!
+
+##### Additional Steps
+
+If you want to return an item using a built in
+you have to return an object.
+
+**Example**:
+```js
+// Floor built-in
+
+module.exports = {
+  name : "floor",
+  run(arg) {
+
+    return { type: "Return", value: Math.floor(arg.value) }
+
+  }
+}
+```

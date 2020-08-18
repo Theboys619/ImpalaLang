@@ -28,8 +28,10 @@ function run(filepath, argv) {
   const parser = new Parser(tokens, lexer.grammar, fullpath);
   const ast = parser.parse();
 
-  if (argv[0] == "--debug")
+  if (argv[0] == "--debug") {
+    console.log(tokens);
     console.log(JSON.stringify(ast, null, 2));
+  }
 
   const interpreter = new Interpreter(ast, lexer.grammar, fullpath);
 

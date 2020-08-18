@@ -154,13 +154,14 @@ class Parser {
 
     let curInput = (typeof input == "object") ? input[0] : input; // Get the input string or the first element of the given input array
     let inputIndex = -1; // Set the index to -1
+    const length = 1;
 
     const nextInput = () => {
       if (typeof input == "object") {
         inputIndex++; // Increment the inputIndex by 1
         curInput = input[inputIndex]; // Get the current input from the inputIndex
       }
-      const length = curInput ? curInput.length : 1; // Get the length of the input for advancing over
+      // const length = curInput ? curInput.length : 1; // Get the length of the input for advancing over
 
       if (this.isDelim(curInput)) // Check if the input is a delimiter
         this.advance(length); // Then advance over all characters and repeat for every possible type
@@ -260,6 +261,26 @@ class Parser {
     return new Statement("Boolean", this.curTok.value == "true"); // Return the statement
   }
 
+  pIf() {
+    this.skipOver("if");
+    const ifStatement = new Statement("If");
+    const condition = this.pExpression();
+
+    ifStatement.value = {
+      condition
+    }
+
+    ifStatement.value.then = new Scope(this.parseDelimiters("{", "}", [";", "\n"], this.pExpression));
+
+    if (this.isKeyword("else")) {
+      this.skipOver("else");
+
+      ifStatement.value.else = new Scope(this.parseDelimiters("{", "}", [";", "\n"], this.pExpression));
+    }
+
+    return ifStatement;
+  }
+
   pAll() {
     return this.$isCall(() => { // Check whether the returned token/statement is a function call
       // console.log("pAll:", this.curTok); // :LOG:
@@ -274,6 +295,9 @@ class Parser {
         const boolean = this.pBoolean();
         this.advance();
         return boolean;
+      }
+      if (this.isKeyword("if")) {
+        return this.pIf();
       }
 
       if (this.isKeyword("return")) { // If the keyword is a return then do things

@@ -1,4 +1,4 @@
-const { ImpalaError } = require("./errors");
+const { ImpalaError, createError } = require("./errors");
 
 /*
   ######################
@@ -51,6 +51,15 @@ class Parser {
     this.curTok = this.tokens[0];
 
     this.ast = [];
+  }
+
+  createError(msg, line, index, filepath = this.filepath) {
+    return {
+      msg,
+      filepath,
+      line,
+      index
+    }
   }
 
   advance(amt = 1) { // Advance to another token
@@ -163,7 +172,7 @@ class Parser {
       }
       // const length = curInput ? curInput.length : 1; // Get the length of the input for advancing over
 
-      if (!curInput) new ImpalaError(`Unexpected token ${this.curTok.value}`, null, {});
+      if (!curInput) new ImpalaError(`Unexpected token '${this.curTok.value}'`, null, this.createError(null, this.curTok.line, this.curTok.index));
 
       if (this.isDelim(curInput)) // Check if the input is a delimiter
         this.advance(length); // Then advance over all characters and repeat for every possible type
@@ -175,8 +184,8 @@ class Parser {
         this.advance(length);
       else if (this.isIdentifier(curInput))
         this.advance(length);
-      else if (inputIndex > input.length) //|| typeof input != "object"
-        new ImpalaError(`Unexpected token ${this.curTok.value}`, null, {}); // If it is never any type then throw an error
+      else if (inputIndex > input.length || typeof input != "object") //
+        new ImpalaError(`Unexpected token '${this.curTok.value}' expected '${curInput}'`, null, this.createError(null, this.curTok.line, this.curTok.index)); // If it is never any type then throw an error
       else
         nextInput();
     }
@@ -200,11 +209,11 @@ class Parser {
 
       if (this.isDelim(end)) break; // If token is the end delimiter of ')' then break
 
-      const parserBind = parser.bind(this, []);
-      const value = parserBind();
+      const parserBind = parser.bind(this, []); // Create bind for the parser with the current class
+      const value = parserBind(); // Call the parser to retrieve the value
 
-      if (value)
-        values.push(value); // Run the parser for the item and push it to the values
+      if (value) // If the value exists then
+        values.push(value); // push it to the values
 
     }
     this.skipOver(end); // Skip over ')'

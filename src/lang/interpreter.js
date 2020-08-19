@@ -126,6 +126,7 @@ class Interpreter {
     func.params = parameters;
     func.returnType = returnType.returnType
     func.env = env;
+    func.filepath = this.filepath;
 
     env.define(exp.value.varname.value, func);
 
@@ -137,7 +138,7 @@ class Interpreter {
       case "Number":
       case "String":
       case "Boolean":
-        return { type: exp.type, value: exp.value };
+        return { type: exp.type, value: exp.value, index: exp.index, line: exp.line };
 
       case "Scope":
         var val = null;
@@ -227,6 +228,9 @@ class Interpreter {
           return argument;
         });
 
+        if (!func.filepath)
+          func.filepath = this.filepath;
+
         // console.log(args); // :LOG:
 
         // console.log("\n"); // :LOG:
@@ -248,7 +252,7 @@ class Interpreter {
         // console.log("RETURN:\n"); // :LOG:
         // console.log(exp, env); // :LOG:
         const returnValue = this.interpret(exp.value, env);
-        const returnType = (exp.value.type == "Binary") ? returnValue.type : (!exp.value.type) ? "Boolean" : exp.value.type;
+        const returnType = (exp.value.type == "Binary" || "Identifier") ? returnValue.type : (!exp.value.type) ? "Boolean" : exp.value.type;
 
         return { type: "Return", returnType, value: returnValue.value };
     }

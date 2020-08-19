@@ -47,10 +47,20 @@ class DeclarationError extends ImpalaError {
   }
 }
 
+function createError(msg, line, index, filepath) {
+  return {
+    msg,
+    filepath,
+    line,
+    index
+  }
+}
+
 module.exports = {
   ImpalaError,
   InvalidToken,
   ImpalaSyntaxError,
   AssignmentError,
-  DeclarationError
+  DeclarationError,
+  createError
 };

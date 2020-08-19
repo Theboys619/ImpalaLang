@@ -1,15 +1,11 @@
 $$$$ Btw dollar signs are comments $$$$
 
-number test(string x) {
-  if (x == "Yes") {
-    log(x);
-  } else if (x == "Maybe") {
-    log("May", " be");
-  } else {
-    log("No");
+number f(number x) {
+  if (x == 1) {
+    return 1;
   }
+
+  return x * f(x - 1);
 }
 
-test("Yes");
-test("Maybe");
-test("Ok");
+log(f(5));

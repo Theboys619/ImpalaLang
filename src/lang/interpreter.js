@@ -21,7 +21,7 @@ class Environment {
     if (name in this.variables)
         return this.variables[name];
 
-    throw new Error("Undefined variable " + name);
+    return false;
   }
 
   lookup(name) {
@@ -46,6 +46,9 @@ class Interpreter {
     this.filepath = filepath;
 
     this.globalThis = new Environment();
+
+    this.startTime = null;
+    this.endTime = null;
 
     this.DatatoTok = this.grammar.dataTypeAssign;
     this.ToktoData = this.grammar.TokTypetoDataType;
@@ -85,10 +88,10 @@ class Interpreter {
       case "%": return { type: "Number", value: num(a) % div(b) };
       case "&&": return { type: "Boolean", value: a !== false && b };
       case "||": return { type: "Boolean", value: a !== false ? a : b };
-      case "<": return { type: "Number", value: num(a) < num(b) };
-      case ">": return { type: "Number", value: num(a) > num(b) };
-      case "<=": return { type: "Number", value: num(a) <= num(b) };
-      case ">=": return { type: "Number", value: num(a) >= num(b) };
+      case "<": return { type: "Boolean", value: num(a) < num(b) };
+      case ">": return { type: "Boolean", value: num(a) > num(b) };
+      case "<=": return { type: "Boolean", value: num(a) <= num(b) };
+      case ">=": return { type: "Boolean", value: num(a) >= num(b) };
       case "==": return { type: "Boolean", value: a === b };
       case "!=": return { type: "Boolean", value: a !== b };
     }
@@ -133,6 +136,14 @@ class Interpreter {
     return func;
   }
 
+  evaluate() {
+    this.startTime = Date.now();
+    this.interpret();
+    this.endTime = Date.now();
+
+    return (this.endTime - this.startTime) / 1000;
+  }
+
   interpret(exp = this.ast, env = this.globalThis) {
     switch(exp.type) {
       case "Number":
@@ -159,11 +170,17 @@ class Interpreter {
         return this.createFunction(exp, env);
 
       case "Variable":
-        return env.get(exp.value.varname);
+        const Variable = env.get(exp.value.varname);
+        if (!Variable) new ImpalaError(`Variable ${exp.value.varname} is not defined!`, null, this.createError(null, exp.value.varname.line, exp.value.varname.index));
+        return Variable;
       case "Identifier":
-        return env.get(exp.value);
+        const IVariable = env.get(exp.value);
+        if (!IVariable) new ImpalaError(`Variable ${exp.value} is not defined!`, null, this.createError(null, exp.line, exp.index));
+        return IVariable;
       case "FunctionGet":
-        return env.get(exp.value.value);
+        const GFunction = env.get(exp.value.value);
+        if (!GFunction) new ImpalaError(`Variable ${exp.value.value} is not defined!`, null, this.createError(null, exp.value.value.line, exp.value.value.index));
+        return GFunction;
 
       case "Assign":
         const assignExprType = exp.left.type;
@@ -213,6 +230,26 @@ class Interpreter {
         const ReassignedVar = env.set(ReassignName, ReassignValue);
         return ReassignedVar;
 
+      case "Crement":
+        const CrementedName = exp.value.varName;
+        const CrementedOldVar = env.get(CrementedName);
+
+        const CrementedLine = exp.value.line;
+        const CrementedIndex = exp.value.index;
+
+        if (!CrementedOldVar) {
+          new ImpalaError(`Variable ${CrementedName} is not defined!`, null, this.createError(null, CrementedLine, CrementedIndex));
+        }
+
+        if (CrementedOldVar.type !== "Number") {
+          new AssignmentError(this.createError(`Cannot increment/decrement a variable with type '${this.ToktoData[CrementedOldVar.type]}'`, CrementedLine, CrementedIndex));
+        }
+
+        const CrementValue = { type: CrementedOldVar.type, value: CrementedOldVar.value + exp.value.increment, index: CrementedIndex, line: CrementedLine };
+        const CrementedVar = env.set(CrementedName, CrementValue);
+
+        return CrementedVar;
+
       case "Binary":
         const left = this.interpret(exp.left, env);
         const right = this.interpret(exp.right, env);
@@ -236,6 +273,22 @@ class Interpreter {
         // console.log("\n"); // :LOG:
 
         return func.apply(null, args);
+      
+      case "ForLoop":
+        let FVariable = this.interpret(exp.value.variable, env);
+        let forCondition = this.interpret(exp.value.canLoop, env);
+        
+        while (forCondition.value) {
+          const forBlock = this.interpret(exp.scope, env);
+          const forIteration = this.interpret(exp.value.iteration, env);
+          forCondition = this.interpret(exp.value.canLoop, env);
+
+          if (forBlock && (forBlock.type == "Return" || forBlock.type == "Break")) {
+            return forBlock;
+          }
+        }
+
+        return null;
 
       case "If":
         const ifCondition = this.interpret(exp.value.condition, env);

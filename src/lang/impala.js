@@ -28,7 +28,7 @@ function run(filepath, argv) {
   const parser = new Parser(tokens, lexer.grammar, fullpath);
   const ast = parser.parse();
 
-  if (argv[0] == "--debug") {
+  if (argv.includes("--debug")) {
     console.log(tokens);
     console.log(JSON.stringify(ast, null, 2));
   }
@@ -48,7 +48,7 @@ function run(filepath, argv) {
     interpreter.defineIdentifier(module.name, module.run);
   }
 
-  const inter = interpreter.interpret();
-  if (inter) console.log(inter);
+  const time = interpreter.evaluate();
+  if (argv.includes("--time") && time >= 0) console.log("Program finished in: " + time);
 
 }

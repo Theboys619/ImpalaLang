@@ -1,4 +1,4 @@
-const { ImpalaError, createError } = require("./errors");
+const { ImpalaError, ImpalaSyntaxError, createError } = require("./errors");
 
 /*
   ######################
@@ -154,11 +154,21 @@ class Parser {
     return this.curTok && (this.curTok.type == "Operator" || this.curTok.type == "BinOperator") && (!value || this.curTok.value == value) && this.curTok;
   }
 
+  isCustom(type, value, peek = false, peekamt = 1) {
+    const tok = this.peek(peekamt);
+
+    if (peek && tok) {
+      return tok && tok.type == type && (!value || tok.value == value) && tok;
+    }
+
+    return this.curTok && this.curTok.type == type && (!value || this.curTok.value == value) && this.curTok;
+  }
+
   isEOF() {
     return this.curTok == null || this.curTok.type == "EOF";
   }
 
-  skipOver(input) { // Skip over an input
+  skipOver(input, type) { // Skip over an input
     // console.log("SKIP:", input, this.curTok) // :LOG:
 
     let curInput = (typeof input == "object") ? input[0] : input; // Get the input string or the first element of the given input array
@@ -183,6 +193,8 @@ class Parser {
       else if (this.isLinebreak(curInput))
         this.advance(length);
       else if (this.isIdentifier(curInput))
+        this.advance(length);
+      else if (type && this.isCustom(type, curInput))
         this.advance(length);
       else if (inputIndex > input.length || typeof input != "object") //
         new ImpalaError(`Unexpected token '${this.curTok.value}' expected '${curInput}'`, null, this.createError(null, this.curTok.line, this.curTok.index)); // If it is never any type then throw an error
@@ -296,6 +308,31 @@ class Parser {
     return ifStatement;
   }
 
+  pForLoop() {
+    this.skipOver("for");
+    const forStatement = new Statement("ForLoop");
+    const scope = new Scope();
+    let condition = {};
+
+    condition.variable = this.pExpression();
+
+    this.skipOver("and");
+
+    condition.canLoop = this.pExpression();
+
+    this.skipOver("=>", "Arrow");
+
+    condition.iteration = this.pExpression();
+    this.advance();
+
+    scope.block = scope.block.concat(this.parseDelimiters("{", "}", this.grammar.ignore, this.pExpression));
+
+    forStatement.value = condition;
+    forStatement.scope = scope;
+
+    return forStatement;
+  }
+
   pAll() {
     return this.$isCall(() => { // Check whether the returned token/statement is a function call
       // console.log("pAll:", this.curTok); // :LOG:
@@ -313,6 +350,9 @@ class Parser {
       }
       if (this.isKeyword("if")) {
         return this.pIf();
+      }
+      if (this.isKeyword("for")) {
+        return this.pForLoop();
       }
 
       if (this.isKeyword("return")) { // If the keyword is a return then do things
@@ -337,7 +377,15 @@ class Parser {
             index: tok.index,
             line: tok.line,
           });
+        } else if (this.isOperator("++")) {
+          return new Statement("Crement", {
+            varName: tok.value,
+            index: tok.index,
+            line: tok.line,
+            increment: 1
+          });
         }
+        // console.log(tok, this.curTok);
         
         return tok; // Return the token saved before advancing
       } else if (this.isDatatype()) { // If it is a datatype return the statement for the variable/function

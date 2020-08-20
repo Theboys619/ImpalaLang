@@ -1,7 +1,7 @@
 ```cpp
 
-for number x = 0 between x and 6 => x++ {
-  $ loops through numbers 1 through six
+for number x = 0 and x <= 6 => x++ {
+  $ loops through numbers 0 through six
   $ increase every time ran
 
   log(x)

@@ -149,7 +149,8 @@ class Interpreter {
       case "Number":
       case "String":
       case "Boolean":
-        return { type: exp.type, value: exp.value, index: exp.index, line: exp.line };
+      case "Object":
+        return exp;
 
       case "Scope":
         var val = null;
@@ -227,7 +228,7 @@ class Interpreter {
           new AssignmentError(this.createError(`Cannot reassign variable to value type '${this.ToktoData[ReassignValue.type]}' of variable type '${this.ToktoData[ReassignOldVar.type]}'`, ReassignLine, ReassignIndex));
         }
         
-        const ReassignedVar = env.set(ReassignName, ReassignValue);
+        const ReassignedVar = env.set(ReassignName, (Reassign.type == "Return") ? ReassignValue.value : ReassignValue);
         return ReassignedVar;
 
       case "Crement":
@@ -254,6 +255,59 @@ class Interpreter {
         const left = this.interpret(exp.left, env);
         const right = this.interpret(exp.right, env);
         return this.iBinaryOp(exp.operator, left.value, right.value);
+
+      case "AccessProp":
+        const ObjectItem = exp.value.object;
+        const ObjectName = ObjectItem.name;
+        const ObjectVar = env.get(exp.value.object.name);
+        if (!ObjectVar) new ImpalaError(`Object ${ObjectName} is not defined!`, null, this.createError(null, ObjectItem.index, ObjectItem.line));
+
+        const ObjectValue = ObjectVar.value;
+
+        let PropValue = ObjectVar;
+
+        for (const prop of exp.value.properties) {
+          if (!PropValue) new ImpalaError(`Cannt access property ${prop.value} of undefined object. Main object is ${ObjectName}`, null, this.createError(null, prop.index, prop.line));
+
+          if (PropValue.type !== "Object") new ImpalaError(`Cannt access property ${prop.value} of a ${PropValue.type || this.ToktoData[PropValue.type]}. Main object is ${ObjectName}.`, null, this.createError(null, prop.index, prop.line));
+          else {
+            PropValue = PropValue.value;
+          }
+          if (prop.type == "FunctionCall") {
+            const PropFunc = PropValue[prop.value.function.value.value];
+            this.interpret(PropFunc, env);
+            if (PropFunc.value) {
+              prop.value.function.value.value = PropFunc.value.varname.value;
+              PropValue = this.interpret(prop, env);
+            } else {
+              const args = prop.value.args.map((arg) => {
+                const argument = this.interpret(arg, env);
+                return argument;
+              });
+              PropValue = PropFunc.apply(null, args);
+            }
+
+            if (PropValue.type == "Return" && PropValue.returnType && PropValue.returnType != "Return") {
+              if (typeof PropValue.value == "Object")
+                PropValue.value.type = PropValue.returnType;
+              PropValue.type = PropValue.returnType;
+            }
+            continue;
+          }
+
+          PropValue = PropValue[prop.value];
+          if (PropValue && PropValue["__POSITIONALDATA__"]) {
+            delete PropValue["__POSITIONALDATA__"]
+          }
+        }
+
+        let AccessLastValue = this.interpret(PropValue, env);
+
+        if (AccessLastValue && AccessLastValue["__POSITIONALDATA__"]) {
+          delete AccessLastValue["__POSITIONALDATA__"];
+        }
+
+        return (AccessLastValue) ? AccessLastValue : PropValue;
 
       case "FunctionCall":
         // console.log(exp.value.function, env); // :LOG:
@@ -304,7 +358,7 @@ class Interpreter {
       case "Return":
         // console.log("RETURN:\n"); // :LOG:
         // console.log(exp, env); // :LOG:
-        const returnValue = this.interpret(exp.value, env);
+        const returnValue = (exp.type == "Return" && !exp.returnType) ? exp.value : (exp.type == "Return" && exp.returnType) ? exp : this.interpret(exp.value, env);
         const returnType = (exp.value.type == "Binary" || "Identifier") ? returnValue.type : (!exp.value.type) ? "Boolean" : exp.value.type;
 
         return { type: "Return", returnType, value: returnValue.value };

@@ -233,6 +233,60 @@ class Parser {
     return values; // Return the values
   }
 
+  parseKeysandValues(start, end, keySeparator, separator, parser) {
+    const object = {};
+    let isFirst = true;
+    let lastKey = null;
+
+    this.skipOver(start);
+    if (this.grammar.ignore.includes(this.curTok.value)) this.advance();
+
+    while (!this.isEOF()) {
+      let isValue = false;
+      if (this.grammar.ignore.includes(this.curTok.value)) this.advance();
+      if (this.isDelim(end)) break;
+
+      if (isFirst) {
+        isFirst = false;
+        lastKey = this.curTok;
+      } else if (this.isDelim(keySeparator)) {
+        this.skipOver(keySeparator);
+        isValue = true;
+      } else {
+        this.skipOver(separator);
+        if (this.grammar.ignore.includes(this.curTok.value)) this.advance();
+        lastKey = this.curTok;
+        isValue = false;
+      }
+
+      if (this.grammar.ignore.includes(this.curTok.value)) this.advance();
+      if (this.isDelim(end)) break;
+
+      const parserBind = parser.bind(this, []);
+      const value = parserBind();
+
+      if (value && lastKey) {
+        object[lastKey.value] = value;
+        // object[lastKey.value].__POSITIONALDATA__ = {
+        //   key: {
+        //     index: lastKey.index,
+        //     line: lastKey.line + 1
+        //   },
+        //   value: {
+        //     index: this.curTok.index,
+        //     line: this.curTok.line + 1
+        //   }
+        // }
+      }
+    }
+
+
+    if (this.grammar.ignore.includes(this.curTok.value)) this.advance();
+    this.skipOver(end);
+
+    return object;
+  }
+
   $isCall(exprCb) {
     let expression = exprCb(); // Call the expression callback to retrieve the returned expression
     // console.log("$isCall:", expression); // :LOG:
@@ -254,6 +308,67 @@ class Parser {
     // console.log("$isVariable", token); // :LOG:
 
     return this.isIdentifier(null, true) ? this.pVariable(token) : token; // If the next token is an identifier parse variable or return the token
+  }
+
+  $isProperty(token, peek) {
+    return this.isDelim(".", peek) ? this.pProperty(token) : token;
+  }
+
+  getProperties(separator) {
+    this.skipOver(separator);
+    const props = [this.pExpression()];
+    this.advance(-1);
+
+    this.advance();
+
+    while (!this.isEOF()) {
+      if (!this.isDelim(separator)) break;
+
+      if (this.isDelim(separator)) this.skipOver(separator);
+      // this.curTok.line++;
+      const expr = this.pExpression();
+
+      if (!["FunctionCall", "Identifier"].includes(expr.type)) {
+        new ImpalaSyntaxError(this.createError({
+          msg: `Invalid property name. Property names can only be a function call or Identifier.`,
+          line: expr.line,
+          index: expr.index
+        }));
+      }
+
+      console.log(expr);
+
+      this.advance(-1);
+      props.push(expr);
+      this.advance();
+
+      if (!this.isDelim(separator)) break;
+    }
+
+    return props;
+  }
+
+  pProperty(token) {
+    const objectName = token.value;
+    const objectIndex = token.index;
+    const objectLine = token.line + 1;
+
+    const properties = this.getProperties(".");
+
+    // this.skipOver(".");
+
+    const PropertyStatement = new Statement("AccessProp", {
+      object: {
+        name: objectName,
+        index: objectIndex,
+        line: objectLine
+      },
+      properties,
+      index: this.curTok.index,
+      line: this.curTok.line + 1
+    });
+
+    return PropertyStatement;
   }
 
   pFunction(statement) {
@@ -333,6 +448,23 @@ class Parser {
     return forStatement;
   }
 
+  pObject() {
+    const index = this.curTok.index;
+    const line = this.curTok.line + 1;
+    const ObjectStatement = new Statement("Object");
+    const MainObject = this.parseKeysandValues("{", "}", ":", ",", this.pExpression);
+
+    ObjectStatement.value = {
+      ...MainObject,
+      // __POSITIONALDATA__: {
+      //   index,
+      //   line
+      // }
+    }
+
+    return ObjectStatement;
+  }
+
   pAll() {
     return this.$isCall(() => { // Check whether the returned token/statement is a function call
       // console.log("pAll:", this.curTok); // :LOG:
@@ -387,9 +519,11 @@ class Parser {
         }
         // console.log(tok, this.curTok);
         
-        return tok; // Return the token saved before advancing
+        return this.$isProperty(tok); // Return the token saved before advancing
       } else if (this.isDatatype()) { // If it is a datatype return the statement for the variable/function
         return this.$isVariable(this.curTok);
+      } else if (this.isDelim("{")) {
+        return this.pObject();
       }
 
       if (this.isString()) {

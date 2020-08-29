@@ -322,7 +322,7 @@ class Interpreter {
         const right = this.interpret(exp.right, env);
         const BinaryNewValue = this.iBinaryOp(exp.operator, left.value, right.value);
 
-        if (exp.left.type == "Identifier") {
+        if (exp.left.type == "Identifier" && ["=", "+=", "-=", "++", "--", "+"].includes(exp.operator)) {
           this.setVariable(exp.left.value, BinaryNewValue, env, exp.left);
         }
 
@@ -431,8 +431,13 @@ class Interpreter {
       case "Return":
         // console.log("RETURN:\n"); // :LOG:
         // console.log(exp, env); // :LOG:
-        const returnValue = (exp.type == "Return" && !exp.returnType) ? exp.value : (exp.type == "Return" && exp.returnType) ? exp : this.interpret(exp.value, env);
-        const returnType = (exp.value.type == "Binary" || "Identifier") ? returnValue.type : (!exp.value.type) ? "Boolean" : exp.value.type;
+        let returnValue = (exp.type == "Return" && !exp.returnType) ? exp.value : (exp.type == "Return" && exp.returnType) ? exp : this.interpret(exp.value, env);
+        let returnType = (exp.value.type == "Binary" || exp.value.type == "Identifier") ? returnValue.type : (!exp.value.type) ? "Boolean" : exp.value.type;
+
+        if (exp.type == "Return" && exp.value && exp.value.type == "Binary") {
+          returnValue = this.interpret(exp.value, env);
+          returnType = returnValue.type;
+        }
 
         return { type: "Return", returnType, value: returnValue.value };
     }

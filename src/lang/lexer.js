@@ -322,7 +322,7 @@ class Lexer {
         let index = this.index;
         let line = this.line;
 
-        while (this.char != null && this.isLetter()) {
+        while (this.char != null && (this.isLetter() || this.isNumber())) {
           value += this.char;
           this.advance();
         }

@@ -10,8 +10,9 @@ const { ImpalaError, ImpalaSyntaxError, createError } = require("./errors");
 
 const PREC = {
   "=": 1,
-  "||": 2,
-  "&&": 3,
+  "+=": 2,
+  "||": 3,
+  "&&": 4,
   "<": 7, ">": 7, "<=": 7, ">=": 7, "==": 7, "!=": 7,
   "+": 10, "-": 10,
   "*": 20, "/": 20, "%": 20,
@@ -194,6 +195,8 @@ class Parser {
         this.advance(length);
       else if (this.isIdentifier(curInput))
         this.advance(length);
+      else if (this.isOperator(curInput))
+        this.advance(length);
       else if (type && this.isCustom(type, curInput))
         this.advance(length);
       else if (inputIndex > input.length || typeof input != "object") //
@@ -306,8 +309,13 @@ class Parser {
 
   $isVariable(token) {
     // console.log("$isVariable", token); // :LOG:
+    let isConst = false;
+    if (token.value == "const") {
+      isConst = true;
+      token = this.advance();
+    }
 
-    return this.isIdentifier(null, true) ? this.pVariable(token) : token; // If the next token is an identifier parse variable or return the token
+    return this.isIdentifier(null, true) ? this.pVariable(token, isConst) : token; // If the next token is an identifier parse variable or return the token
   }
 
   $isProperty(token, peek) {
@@ -379,11 +387,12 @@ class Parser {
     return statement;
   }
 
-  pVariable(dataType) {
+  pVariable(dataType, isConst = false) {
     const varname = this.advance(); // Get the variable name by advancing
     let variable = new Statement("Variable", { // Create a new variable statement
       dataType, // With the datatype
-      varname // and variable name
+      varname, // and variable name
+      isConst
     });
 
     this.advance(); // Advance to the next token to continue parsing
@@ -485,6 +494,10 @@ class Parser {
       }
       if (this.isKeyword("for")) {
         return this.pForLoop();
+      }
+
+      if (this.isKeyword("const")) {
+        return this.$isVariable(this.curTok);
       }
 
       if (this.isKeyword("return")) { // If the keyword is a return then do things

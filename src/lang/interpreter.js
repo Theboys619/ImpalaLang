@@ -1,4 +1,4 @@
-const { AssignmentError, DeclarationError, ImpalaError } = require("./errors");
+const { AssignmentError, DeclarationError, ImpalaError, SyntaxError } = require("./errors");
 
 class Environment {
   constructor(parent) {
@@ -67,21 +67,73 @@ class Interpreter {
     this.globalThis.define(name, cb);
   }
 
+  getVariable(name, env, { line, index }) {
+    const variable = env.get(name);
+
+    if (!variable) {
+      new ImpalaError(`Variable ${name} is not defined!`, null, this.createError(null, line, index));
+    }
+    
+    return variable;
+  }
+
+  setVariable(name, value, env, { line, index }) {
+    const setvalue = this.interpret(value, env);
+
+    const variable = env.get(name);
+    
+    if (variable.isConst) {
+      new AssignmentError(this.createError(`Cannot assign '${setvalue.value}' to constant variable '${name}'`, line, index));
+    }
+
+    if (!variable) {
+      new ImpalaError(`Variable ${name} is not defined!`, null, this.createError(null, line, index));
+    }
+
+    if (variable.type !== setvalue.type) {
+      new AssignmentError(this.createError(`Cannot reassign variable to value type '${this.ToktoData[setvalue.type]}' of variable type '${this.ToktoData[variable.type]}'`, line, index));
+    }
+    
+    const ReassignedVar = env.set(name, (setvalue.type == "Return") ? setvalue.value : setvalue);
+
+    return ReassignedVar;
+  }
+
   iBinaryOp(op, a, b) {
     function num(x) {
         if (typeof x != "number")
-            throw new Error("Expected number but got " + x);
+            throw new ImpalaError(`Expected a number but got ${x}`, "SyntaxError", {
+              line: "UNKNOWN",
+              index: "UNKNOWN"
+            });
         return x;
     }
 
     function div(x) {
         if (num(x) == 0)
-            throw new Error("Divide by zero");
+            throw new ImpalaError("Cannot divide by zero", "DivideByZero", {
+              line: "UNKNOWN",
+              index: "UNKNOWN"
+            });
         return x;
     }
 
+    function string(x) {
+      if (typeof x != "string")
+        throw new SyntaxError({ msg: `Expected a string but got ${x}`, line: "UNKNOWN", index: "UNKNOWN" });
+      return x;
+    }
+
+    function concat(x, y) {
+      if (typeof x == "number") {
+        return { type: "Number", value: num(x) + num(y) };
+      } else {
+        return { type: "String", value: string(x) + string(y) };
+      }
+    }
+
     switch (op) {
-      case "+": return { type: "Number", value: num(a) + num(b) };
+      case "+": return concat(a, b);
       case "-": return { type: "Number", value: num(a) - num(b) };
       case "*": return { type: "Number", value: num(a) * num(b) };
       case "/": return { type: "Number", value: num(a) / div(b) };
@@ -94,6 +146,7 @@ class Interpreter {
       case ">=": return { type: "Boolean", value: num(a) >= num(b) };
       case "==": return { type: "Boolean", value: a === b };
       case "!=": return { type: "Boolean", value: a !== b };
+      case "+=": return concat(a, b);
     }
     throw new Error("Can't apply operator " + op);
   }
@@ -111,7 +164,7 @@ class Interpreter {
 
         // console.log(parameters[i].value, args); // :LOG:
 
-        if (paramType.value == this.ToktoData[argType])
+        if (argType != "any" && paramType.value == this.ToktoData[argType])
           scope.define(parameters[i].value.varname.value, i < args.length ? args[i] : false);
         else
           new AssignmentError(this.createError(`Cannot assign value with type '${this.ToktoData[argType]}' to argument type '${paramType.value}'`, paramType.line, paramType.index));
@@ -119,11 +172,14 @@ class Interpreter {
       
       const returnValue = this.interpret(exp.value.scope, scope);
 
-      if (typeof returnValue == "object") {
-        if (returnType.value !== this.ToktoData[returnValue.returnType]) {
+      if (returnValue && typeof returnValue == "object") {
+        if (returnType.value != "any" && returnType.value !== this.ToktoData[returnValue.returnType]) {
           new AssignmentError(this.createError(`Cannot return type '${this.ToktoData[returnValue.returnType]}' in function type '${returnType.value}'`, returnType.line, returnType.index))
         }
         return returnValue;
+      } else if (returnType && !returnValue) {
+        if (returnType.value != "none")
+          new AssignmentError(this.createError(`Function must return type '${returnType.value}'`, returnType.line, returnType.index));
       }
     }
     func.params = parameters;
@@ -197,6 +253,8 @@ class Interpreter {
         const varName = exp.left.value.varname;
         const value = this.interpret(exp.right, env);
 
+        value.isConst = exp.left.value.isConst;
+
         // console.log(value); // :LOG:
 
         let variable = env.set(varName.value, value);
@@ -205,7 +263,7 @@ class Interpreter {
           variable = env.define(varName.value, value);
         }
 
-        if (this.DatatoTok[dataType.value] !== value.type) {
+        if (dataType.value != "any" && this.DatatoTok[dataType.value] !== value.type) {
           new AssignmentError(this.createError(`Cannot assign value with type '${this.ToktoData[exp.right.type]}' to variable type '${dataType.value}'`, dataType.line, dataType.index));
         }
         return variable;
@@ -218,17 +276,21 @@ class Interpreter {
         const ReassignLine = exp.left.value.line;
         const ReassignIndex = exp.left.value.index;
 
+        if (ReassignOldVar.isConst) {
+          new AssignmentError(this.createError(`Cannot assign '${ReassignValue.value}' to constant variable '${ReassignName}'`, ReassignLine, ReassignIndex));
+        }
+
         if (!ReassignOldVar) {
           new ImpalaError(`Variable ${ReassignName} is not defined!`, null, this.createError(null, ReassignLine, ReassignIndex));
         }
 
         // console.log(ReassignOldVar);
 
-        if (ReassignOldVar.type !== ReassignValue.type) {
+        if (ReassignOldVar.type != "any" && ReassignOldVar.type !== ReassignValue.type) {
           new AssignmentError(this.createError(`Cannot reassign variable to value type '${this.ToktoData[ReassignValue.type]}' of variable type '${this.ToktoData[ReassignOldVar.type]}'`, ReassignLine, ReassignIndex));
         }
         
-        const ReassignedVar = env.set(ReassignName, (Reassign.type == "Return") ? ReassignValue.value : ReassignValue);
+        const ReassignedVar = env.set(ReassignName, (Reassign.type == "Return") ? ReassignValue.value : ReassignValue); // Possibly ReassignValue
         return ReassignedVar;
 
       case "Crement":
@@ -237,6 +299,10 @@ class Interpreter {
 
         const CrementedLine = exp.value.line;
         const CrementedIndex = exp.value.index;
+
+        if (CrementedOldVar.isConst) {
+          new AssignmentError(this.createError(`Cannot increment constant variable '${CrementedName}'`, CrementedLine, CrementedIndex));
+        }
 
         if (!CrementedOldVar) {
           new ImpalaError(`Variable ${CrementedName} is not defined!`, null, this.createError(null, CrementedLine, CrementedIndex));
@@ -254,7 +320,14 @@ class Interpreter {
       case "Binary":
         const left = this.interpret(exp.left, env);
         const right = this.interpret(exp.right, env);
-        return this.iBinaryOp(exp.operator, left.value, right.value);
+        const BinaryNewValue = this.iBinaryOp(exp.operator, left.value, right.value);
+
+        if (exp.left.type == "Identifier") {
+          this.setVariable(exp.left.value, BinaryNewValue, env, exp.left);
+        }
+
+
+        return BinaryNewValue;
 
       case "AccessProp":
         const ObjectItem = exp.value.object;
@@ -267,9 +340,9 @@ class Interpreter {
         let PropValue = ObjectVar;
 
         for (const prop of exp.value.properties) {
-          if (!PropValue) new ImpalaError(`Cannt access property ${prop.value} of undefined object. Main object is ${ObjectName}`, null, this.createError(null, prop.index, prop.line));
+          if (!PropValue) new ImpalaError(`Cannot access property ${prop.value} of undefined object. Main object is ${ObjectName}`, null, this.createError(null, prop.index, prop.line));
 
-          if (PropValue.type !== "Object") new ImpalaError(`Cannt access property ${prop.value} of a ${PropValue.type || this.ToktoData[PropValue.type]}. Main object is ${ObjectName}.`, null, this.createError(null, prop.index, prop.line));
+          if (PropValue.type !== "Object") new ImpalaError(`Cannot access property ${prop.value} of a ${PropValue.type || this.ToktoData[PropValue.type]}. Main object is ${ObjectName}.`, null, this.createError(null, prop.index, prop.line));
           else {
             PropValue = PropValue.value;
           }

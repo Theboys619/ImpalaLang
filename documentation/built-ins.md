@@ -50,7 +50,7 @@ Here is the Schema:
 ```json
 {
   "type": "Return",
-  "returnType": "The type you are returning here"
+  "returnType": "The type you are returning here",
   "value": "RETURN TYPE VALUE HERE"
 }
 ```

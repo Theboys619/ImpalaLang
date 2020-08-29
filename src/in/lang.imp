@@ -1,3 +1,8 @@
-for number x = 0 and x <= 10000 => x++ {
-  log(x);
-}
+any var1 = "Hi"; $ Could also be type string
+any var2 = " World!"; $ Same with this
+
+log(var1 + var2);
+
+var1 += " Again!";
+
+log(var1);

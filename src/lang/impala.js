@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+
+// Credit where credit is due:
+// Help from 'http://lisperator.net/pltut/'
+
 const fs = require("fs");
 const readline = require("readline");
 

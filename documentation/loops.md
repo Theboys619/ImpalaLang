@@ -1,3 +1,5 @@
+### Loops
+
 ```cpp
 
 for number x = 0 and x <= 6 => x++ {

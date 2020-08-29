@@ -3,7 +3,7 @@
 If else chains and conditions should look like the following.
 
 ```cpp
-number fact(number x) { $ Basic factorial function
+number fact(number x) { // $ Basic factorial function
   if (x == 1) {
     return 1;
   } else {
@@ -11,15 +11,15 @@ number fact(number x) { $ Basic factorial function
   }
 }
 
-log(fact(5)) $ -> 120
+log(fact(5)) // $ -> 120
 ```
 
 ```cpp
 if (CONDITION) {
-  $ CODE
+  // $ CODE
 } else if (CONDITION) {
-  $ CODE
+  // $ CODE
 } else {
-  $ CODE
+  // $ CODE
 }
 ```

@@ -9,6 +9,9 @@ You can chain these to have really long blocks (not ideal).
 
 Impala also has a REPL that you can use to evaluate chunks of code.
 
+
+Read the documentation markdown files for more info on how to use the language.
+
 #### [Impala CLI]
 
 Impala also has its own CLI to run your code.

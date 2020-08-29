@@ -7,7 +7,7 @@ Strings can be concatenated via a plus (+);
 Strings can be created in various ways.
 
 **Example**
-```ts
+```cpp
 string str1 = "This is a string";
 string str2 = 'This is also a string';
 string str3 = `This is also a string`;
@@ -15,7 +15,7 @@ string str3 = `This is also a string`;
 
 Strings can be concatenated like so:
 
-```ts
+```cpp
 string str1 = "This is a string";
 string str2 = 'This is also a string';
 string str3 = `This is also a string`;

@@ -1,5 +1,13 @@
 ### Variables
 
+Variables can have many datatypes.
+These include numbers, strings, booleans, or a type of anything.
+
+The variables can also be constant which means they can never change.
+
+Assigning the wrong datatype or assigning to a constant will throw an error.
+This is great because you can debug code faster and easier.
+
 ```cpp
 number x = 45;
 string msg = "Hello there";

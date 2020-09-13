@@ -1,4 +1,5 @@
 clear
-chmod 777 "./src/lang/impala.js"
-"./src/lang/impala.js" run "./src/in/lang.imp" --time --debug
+cd ./bin
+chmod 777 "impala.js"
+"./impala.js" run "../src/in/lang.imp" --time
 # "./src/lang/impala.js"

@@ -1,4 +1,8 @@
 const { ImpalaError, ImpalaSyntaxError, createError } = require("./errors");
+const Lexer = require("./lexer.js");
+
+const Path = require("path");
+const fs = require("fs");
 
 /*
   ######################
@@ -474,6 +478,41 @@ class Parser {
     return ObjectStatement;
   }
 
+  pImport() {
+    this.skipOver("import");
+
+    const importpath = Path.join(this.filepath, "../", this.curTok.value);
+    if (!fs.existsSync(importpath)) throw new ImpalaError(`Cannot import a file that does not exist! File ${importpath} does not exist!`, null, this.createError(null, this.curTok.line, this.curTok.index));
+
+    const filedata = fs.readFileSync(importpath, "utf8");
+    const lexer = new Lexer(filedata, importpath);
+    const newtokens = lexer.tokenize();
+    newtokens.splice(newtokens.length-1, 1);
+
+    this.tokens.splice(this.pos, 1);
+    this.tokens.splice(this.pos, 0, ...newtokens);
+    this.curTok = this.tokens[this.pos];
+
+    this.tokens.splice(this.pos-1, 1);
+    this.advance(-1);
+
+    return this.pAll();
+  }
+
+  pSnippet() {
+    let snippetType = "CPPSnippet";
+
+    if (this.curTok.value.startsWith("main")) {
+      snippetType = "MainCPPSnippet";
+      this.curTok.value = this.curTok.value.substring(4);
+    }
+
+    const CPPSnippet = new Statement(snippetType, this.curTok);
+    this.advance();
+
+    return CPPSnippet;
+  }
+
   pAll() {
     return this.$isCall(() => { // Check whether the returned token/statement is a function call
       // console.log("pAll:", this.curTok); // :LOG:
@@ -482,6 +521,14 @@ class Parser {
         const expression = this.pExpression(); // Parse the expression (EX: 1 + 2 * 4)
         this.skipOver(")"); // Skip over the ')' token
         return expression; // Return the expression
+      }
+
+      if (this.isKeyword("import")) {
+        return this.pImport();
+      }
+
+      if (this.curTok.type == "CPPSnippet") {
+        return this.pSnippet();
       }
 
       if (this.isKeyword("true") || this.isKeyword("false")) {

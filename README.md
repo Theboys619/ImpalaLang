@@ -29,7 +29,7 @@ The built-in functions are made with the native/base code of the language. Which
 #### [Impala VSCode Extension]
 
 We have created a VSCode Extension that you can use for syntax highlighting.
-Right now this extension if very limited on what it highlights. Most of the highlights are complete but not all.
+Right now this extension is very limited on what it highlights. Most of the highlights are complete but not all.
 
 The extension is not published on the extension market place so you would have to download it from the github repo.
 

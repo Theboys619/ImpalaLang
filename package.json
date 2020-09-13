@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "bin": {
-    "impala": "impala.js"
+    "impala": "./bin/impala.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "./bin/impala.js ./src/in/lang.imp"
   },
   "keywords": [],
   "author": "",

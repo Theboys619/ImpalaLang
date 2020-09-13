@@ -15,7 +15,7 @@ const DATA = { // Define grammar here
   linebreaks: ["\n"],
 
   dataTypes: ["any", "string", "number", "bool", "object", "none"],
-  keywords: ["true", "false", "return", "const", "for", "while", "do", "if", "else", "between", "and"],
+  keywords: ["true", "false", "return", "const", "for", "while", "do", "if", "else", "between", "and", "import"],
 
   dataTypeAssign: {
     "any": ["String", "Number", "Boolean", "object", "none"],
@@ -36,7 +36,7 @@ const DATA = { // Define grammar here
   },
 
   operators: ["=", "==", "!=", "+=", "-=", "++", "--", "<", "<=", ">", ">=", "&&", "||"],
-  binOperators: ["*", "/", "+", "-"],
+  binOperators: ["*", "/", "%", "+", "-"],
   digits: "0123456789",
   strings: ["\"", "'", "`"],
   delimiters: [";", ",", ".", ":"],
@@ -135,7 +135,14 @@ class Lexer {
       str += this.peek(i);
     }
 
-    return DATA.singleComment.includes(str);
+    if (DATA.singleComment.includes(str)) return { multiLine: false };
+    else if (DATA.multiComment[0] == char + this.peek()) return { multiLine: true };
+
+    return false;
+  }
+
+  isSnippet(char = this.char) {
+    return (char == "`" && this.peek() == "`" && this.peek(2) == "`");
   }
 
   isOther(char = this.char) {
@@ -189,10 +196,36 @@ class Lexer {
         this.advance(); // Advance to the next character
       }
 
-      if (this.isComment()) {
+      if (this.isComment() && this.isComment().multiLine == false) {
         while (this.char != null && !this.isLinebreak()) {
           this.advance();
         }
+      }
+
+      if (this.isComment() && this.isComment().multiLine) {
+        while (this.char != null && (this.char + this.peek() != DATA.multiComment[1])) {
+          this.advance();
+        }
+
+        this.advance(2);
+      }
+
+      if (this.isSnippet()) {
+        this.advance(3);
+        let code = "";
+
+        while (this.char != null && !this.isSnippet()) {
+          code += this.char;
+          this.advance();
+        }
+
+        this.tokens.push({
+          type: "CPPSnippet",
+          value: code,
+          index: this.index,
+          line: this.line
+        });
+        this.advance(3);
       }
 
       if (this.isOther()) {
@@ -352,7 +385,7 @@ class Lexer {
       type: "EOF",
       value: "EOF",
       index: 0,
-      line: this.tokens[this.tokens.length-1].line + 1
+      line: (this.tokens.length > 0) ? this.tokens[this.tokens.length-1].line + 1 : 0
     });
 
     return this.tokens;

@@ -1,9 +1,11 @@
-number factorial(number x) {
+import "stdio.imp";
+
+number fact(number x) {
   if (x == 1) {
     return 1;
   }
 
-  return x * factorial(x - 1);
+  return x * fact(x - 1);
 }
 
-log(factorial(5));
+log(fact(fact(2)));

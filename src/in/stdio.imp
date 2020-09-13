@@ -1,0 +1,59 @@
+```
+#include <iostream>
+
+/* Log Function */
+void log(std::string msg) {
+  std::cout << msg << std::endl;
+}
+void log(const char* msg) {
+  std::cout << msg << std::endl;
+}
+void log(int msg) {
+  std::cout << msg << std::endl;
+}
+void log(float msg) {
+  std::cout << msg << std::endl;
+}
+void log(bool msg) {
+  std::string boolstr = "false";
+  if (msg == true) boolstr = "true";
+  std::cout << boolstr << std::endl;
+}
+void log(ImpalaNumber msg) {
+  if (msg.type == 1) {
+    std::cout << msg.a << std::endl;
+  } else {
+    std::cout << msg.b << std::endl;
+  }
+}
+void log(ImpalaAny msg) {
+  if (msg.type == 1) {
+    if (msg.num.type == 1)
+      std::cout << msg.num.a << std::endl;
+    else
+      std::cout << msg.num.b << std::endl;
+  } else if (msg.type == 2) {
+    std::cout << msg.str << std::endl;
+  } else {
+    std::string boolstr = "false";
+    if (msg.bln == true) boolstr = "true";
+    std::cout << boolstr << std::endl;
+  }
+}
+template <typename T, typename ... Args>
+void log(T arg, Args... args) {
+  std::cout << arg << " ";
+
+  log(args...);
+
+  std::cout << "\n";
+}
+
+/* Input Function */
+std::string stdcin() {
+  std::string msg;
+  std::cin >> msg;
+
+  return msg;
+}
+```

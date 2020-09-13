@@ -120,7 +120,7 @@ class Interpreter {
 
     function string(x) {
       if (typeof x != "string")
-        throw new SyntaxError({ msg: `Expected a string but got ${x}`, line: "UNKNOWN", index: "UNKNOWN" });
+        throw new SyntaxError(this.createError({ msg: `Expected a string but got ${x}`, line: "UNKNOWN", index: "UNKNOWN" }));
       return x;
     }
 
@@ -170,12 +170,16 @@ class Interpreter {
           new AssignmentError(this.createError(`Cannot assign value with type '${this.ToktoData[argType]}' to argument type '${paramType.value}'`, paramType.line, paramType.index));
       }
       
-      const returnValue = this.interpret(exp.value.scope, scope);
+      let returnValue = this.interpret(exp.value.scope, scope);
 
       if (returnValue && typeof returnValue == "object") {
         if (returnType.value != "any" && returnType.value !== this.ToktoData[returnValue.returnType]) {
           new AssignmentError(this.createError(`Cannot return type '${this.ToktoData[returnValue.returnType]}' in function type '${returnType.value}'`, returnType.line, returnType.index))
         }
+        if (returnType.value == "string") {
+          returnValue = this.formatString(returnValue, scope, { line: exp.line, index: exp.index });
+        }
+
         return returnValue;
       } else if (returnType && !returnValue) {
         if (returnType.value != "none")
@@ -192,6 +196,22 @@ class Interpreter {
     return func;
   }
 
+  formatString(exp, env) {
+    const newstr = exp.value.replace(/\{\{(.+?)\}\}/g, (match, g1) => {
+      if (match && g1) {
+        const variable = this.getVariable(g1, env, { line: exp.line, index: exp.index });
+
+        return variable.value;
+      }
+
+      return match;
+    });
+
+    exp.value = newstr;
+    
+    return exp;
+  }
+
   evaluate() {
     this.startTime = Date.now();
     this.interpret();
@@ -203,7 +223,9 @@ class Interpreter {
   interpret(exp = this.ast, env = this.globalThis) {
     switch(exp.type) {
       case "Number":
+        return exp;
       case "String":
+        return this.formatString(exp, env);
       case "Boolean":
       case "Object":
         return exp;

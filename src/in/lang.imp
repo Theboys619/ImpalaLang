@@ -1,11 +1,9 @@
-$$$$ Btw dollar signs are comments $$$$
-
-number f(number x) {
+number factorial(number x) {
   if (x == 1) {
     return 1;
   }
 
-  return x * f(x - 1);
+  return x * factorial(x - 1);
 }
 
-log(f(5));
+log(factorial(5));

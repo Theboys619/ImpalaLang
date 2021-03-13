@@ -14,19 +14,21 @@ const DATA = { // Define grammar here
   whitespace: [" ", "\t"],
   linebreaks: ["\n"],
 
-  dataTypes: ["any", "string", "number", "bool"],
+  dataTypes: ["any", "string", "number", "bool", "object", "none"],
   keywords: ["true", "false", "return", "const", "for", "while", "do", "if", "else", "between", "and"],
 
   dataTypeAssign: {
-    "any": ["String", "Number", "Boolean"],
+    "any": ["String", "Number", "Boolean", "object", "none"],
     "string": "String",
     "number": "Number",
-    "bool": "Boolean"
+    "bool": "Boolean",
+    "object": "Object"
   },
   TokTypetoDataType: {
     "Number": "number",
     "String": "string",
-    "Boolean": "bool"
+    "Boolean": "bool",
+    "Object": "object"
   },
   keywordAssign: {
     "true": "Boolean",
@@ -37,7 +39,7 @@ const DATA = { // Define grammar here
   binOperators: ["*", "/", "+", "-"],
   digits: "0123456789",
   strings: ["\"", "'", "`"],
-  delimiters: [";", ","],
+  delimiters: [";", ",", ".", ":"],
   parenthesis: ["(", ")"],
   curlybraces: ["{", "}"],
   singleComment: "$",
@@ -320,7 +322,7 @@ class Lexer {
         let index = this.index;
         let line = this.line;
 
-        while (this.char != null && this.isLetter()) {
+        while (this.char != null && (this.isLetter() || this.isNumber())) {
           value += this.char;
           this.advance();
         }

@@ -1,4 +1,4 @@
-const { AssignmentError, DeclarationError, ImpalaError } = require("./errors");
+const { AssignmentError, DeclarationError, ImpalaError, SyntaxError } = require("./errors");
 
 class Environment {
   constructor(parent) {
@@ -21,7 +21,7 @@ class Environment {
     if (name in this.variables)
         return this.variables[name];
 
-    throw new Error("Undefined variable " + name);
+    return false;
   }
 
   lookup(name) {
@@ -47,6 +47,9 @@ class Interpreter {
 
     this.globalThis = new Environment();
 
+    this.startTime = null;
+    this.endTime = null;
+
     this.DatatoTok = this.grammar.dataTypeAssign;
     this.ToktoData = this.grammar.TokTypetoDataType;
   }
@@ -64,33 +67,86 @@ class Interpreter {
     this.globalThis.define(name, cb);
   }
 
+  getVariable(name, env, { line, index }) {
+    const variable = env.get(name);
+
+    if (!variable) {
+      new ImpalaError(`Variable ${name} is not defined!`, null, this.createError(null, line, index));
+    }
+    
+    return variable;
+  }
+
+  setVariable(name, value, env, { line, index }) {
+    const setvalue = this.interpret(value, env);
+
+    const variable = env.get(name);
+    
+    if (variable.isConst) {
+      new AssignmentError(this.createError(`Cannot assign '${setvalue.value}' to constant variable '${name}'`, line, index));
+    }
+
+    if (!variable) {
+      new ImpalaError(`Variable ${name} is not defined!`, null, this.createError(null, line, index));
+    }
+
+    if (variable.type !== setvalue.type) {
+      new AssignmentError(this.createError(`Cannot reassign variable to value type '${this.ToktoData[setvalue.type]}' of variable type '${this.ToktoData[variable.type]}'`, line, index));
+    }
+    
+    const ReassignedVar = env.set(name, (setvalue.type == "Return") ? setvalue.value : setvalue);
+
+    return ReassignedVar;
+  }
+
   iBinaryOp(op, a, b) {
     function num(x) {
         if (typeof x != "number")
-            throw new Error("Expected number but got " + x);
+            throw new ImpalaError(`Expected a number but got ${x}`, "SyntaxError", {
+              line: "UNKNOWN",
+              index: "UNKNOWN"
+            });
         return x;
     }
 
     function div(x) {
         if (num(x) == 0)
-            throw new Error("Divide by zero");
+            throw new ImpalaError("Cannot divide by zero", "DivideByZero", {
+              line: "UNKNOWN",
+              index: "UNKNOWN"
+            });
         return x;
     }
 
+    function string(x) {
+      if (typeof x != "string")
+        throw new SyntaxError({ msg: `Expected a string but got ${x}`, line: "UNKNOWN", index: "UNKNOWN" });
+      return x;
+    }
+
+    function concat(x, y) {
+      if (typeof x == "number") {
+        return { type: "Number", value: num(x) + num(y) };
+      } else {
+        return { type: "String", value: string(x) + string(y) };
+      }
+    }
+
     switch (op) {
-      case "+": return { type: "Number", value: num(a) + num(b) };
+      case "+": return concat(a, b);
       case "-": return { type: "Number", value: num(a) - num(b) };
       case "*": return { type: "Number", value: num(a) * num(b) };
       case "/": return { type: "Number", value: num(a) / div(b) };
       case "%": return { type: "Number", value: num(a) % div(b) };
       case "&&": return { type: "Boolean", value: a !== false && b };
       case "||": return { type: "Boolean", value: a !== false ? a : b };
-      case "<": return { type: "Number", value: num(a) < num(b) };
-      case ">": return { type: "Number", value: num(a) > num(b) };
-      case "<=": return { type: "Number", value: num(a) <= num(b) };
-      case ">=": return { type: "Number", value: num(a) >= num(b) };
+      case "<": return { type: "Boolean", value: num(a) < num(b) };
+      case ">": return { type: "Boolean", value: num(a) > num(b) };
+      case "<=": return { type: "Boolean", value: num(a) <= num(b) };
+      case ">=": return { type: "Boolean", value: num(a) >= num(b) };
       case "==": return { type: "Boolean", value: a === b };
       case "!=": return { type: "Boolean", value: a !== b };
+      case "+=": return concat(a, b);
     }
     throw new Error("Can't apply operator " + op);
   }
@@ -108,7 +164,7 @@ class Interpreter {
 
         // console.log(parameters[i].value, args); // :LOG:
 
-        if (paramType.value == this.ToktoData[argType])
+        if (argType != "any" && paramType.value == this.ToktoData[argType])
           scope.define(parameters[i].value.varname.value, i < args.length ? args[i] : false);
         else
           new AssignmentError(this.createError(`Cannot assign value with type '${this.ToktoData[argType]}' to argument type '${paramType.value}'`, paramType.line, paramType.index));
@@ -116,11 +172,14 @@ class Interpreter {
       
       const returnValue = this.interpret(exp.value.scope, scope);
 
-      if (typeof returnValue == "object") {
-        if (returnType.value !== this.ToktoData[returnValue.returnType]) {
+      if (returnValue && typeof returnValue == "object") {
+        if (returnType.value != "any" && returnType.value !== this.ToktoData[returnValue.returnType]) {
           new AssignmentError(this.createError(`Cannot return type '${this.ToktoData[returnValue.returnType]}' in function type '${returnType.value}'`, returnType.line, returnType.index))
         }
         return returnValue;
+      } else if (returnType && !returnValue) {
+        if (returnType.value != "none")
+          new AssignmentError(this.createError(`Function must return type '${returnType.value}'`, returnType.line, returnType.index));
       }
     }
     func.params = parameters;
@@ -133,12 +192,21 @@ class Interpreter {
     return func;
   }
 
+  evaluate() {
+    this.startTime = Date.now();
+    this.interpret();
+    this.endTime = Date.now();
+
+    return (this.endTime - this.startTime) / 1000;
+  }
+
   interpret(exp = this.ast, env = this.globalThis) {
     switch(exp.type) {
       case "Number":
       case "String":
       case "Boolean":
-        return { type: exp.type, value: exp.value, index: exp.index, line: exp.line };
+      case "Object":
+        return exp;
 
       case "Scope":
         var val = null;
@@ -159,11 +227,17 @@ class Interpreter {
         return this.createFunction(exp, env);
 
       case "Variable":
-        return env.get(exp.value.varname);
+        const Variable = env.get(exp.value.varname);
+        if (!Variable) new ImpalaError(`Variable ${exp.value.varname} is not defined!`, null, this.createError(null, exp.value.varname.line, exp.value.varname.index));
+        return Variable;
       case "Identifier":
-        return env.get(exp.value);
+        const IVariable = env.get(exp.value);
+        if (!IVariable) new ImpalaError(`Variable ${exp.value} is not defined!`, null, this.createError(null, exp.line, exp.index));
+        return IVariable;
       case "FunctionGet":
-        return env.get(exp.value.value);
+        const GFunction = env.get(exp.value.value);
+        if (!GFunction) new ImpalaError(`Variable ${exp.value.value} is not defined!`, null, this.createError(null, exp.value.value.line, exp.value.value.index));
+        return GFunction;
 
       case "Assign":
         const assignExprType = exp.left.type;
@@ -179,6 +253,8 @@ class Interpreter {
         const varName = exp.left.value.varname;
         const value = this.interpret(exp.right, env);
 
+        value.isConst = exp.left.value.isConst;
+
         // console.log(value); // :LOG:
 
         let variable = env.set(varName.value, value);
@@ -187,7 +263,7 @@ class Interpreter {
           variable = env.define(varName.value, value);
         }
 
-        if (this.DatatoTok[dataType.value] !== value.type) {
+        if (dataType.value != "any" && this.DatatoTok[dataType.value] !== value.type) {
           new AssignmentError(this.createError(`Cannot assign value with type '${this.ToktoData[exp.right.type]}' to variable type '${dataType.value}'`, dataType.line, dataType.index));
         }
         return variable;
@@ -200,23 +276,111 @@ class Interpreter {
         const ReassignLine = exp.left.value.line;
         const ReassignIndex = exp.left.value.index;
 
+        if (ReassignOldVar.isConst) {
+          new AssignmentError(this.createError(`Cannot assign '${ReassignValue.value}' to constant variable '${ReassignName}'`, ReassignLine, ReassignIndex));
+        }
+
         if (!ReassignOldVar) {
           new ImpalaError(`Variable ${ReassignName} is not defined!`, null, this.createError(null, ReassignLine, ReassignIndex));
         }
 
         // console.log(ReassignOldVar);
 
-        if (ReassignOldVar.type !== ReassignValue.type) {
+        if (ReassignOldVar.type != "any" && ReassignOldVar.type !== ReassignValue.type) {
           new AssignmentError(this.createError(`Cannot reassign variable to value type '${this.ToktoData[ReassignValue.type]}' of variable type '${this.ToktoData[ReassignOldVar.type]}'`, ReassignLine, ReassignIndex));
         }
         
-        const ReassignedVar = env.set(ReassignName, ReassignValue);
+        const ReassignedVar = env.set(ReassignName, (Reassign.type == "Return") ? ReassignValue.value : ReassignValue); // Possibly ReassignValue
         return ReassignedVar;
+
+      case "Crement":
+        const CrementedName = exp.value.varName;
+        const CrementedOldVar = env.get(CrementedName);
+
+        const CrementedLine = exp.value.line;
+        const CrementedIndex = exp.value.index;
+
+        if (CrementedOldVar.isConst) {
+          new AssignmentError(this.createError(`Cannot increment constant variable '${CrementedName}'`, CrementedLine, CrementedIndex));
+        }
+
+        if (!CrementedOldVar) {
+          new ImpalaError(`Variable ${CrementedName} is not defined!`, null, this.createError(null, CrementedLine, CrementedIndex));
+        }
+
+        if (CrementedOldVar.type !== "Number") {
+          new AssignmentError(this.createError(`Cannot increment/decrement a variable with type '${this.ToktoData[CrementedOldVar.type]}'`, CrementedLine, CrementedIndex));
+        }
+
+        const CrementValue = { type: CrementedOldVar.type, value: CrementedOldVar.value + exp.value.increment, index: CrementedIndex, line: CrementedLine };
+        const CrementedVar = env.set(CrementedName, CrementValue);
+
+        return CrementedVar;
 
       case "Binary":
         const left = this.interpret(exp.left, env);
         const right = this.interpret(exp.right, env);
-        return this.iBinaryOp(exp.operator, left.value, right.value);
+        const BinaryNewValue = this.iBinaryOp(exp.operator, left.value, right.value);
+
+        if (exp.left.type == "Identifier" && ["=", "+=", "-=", "++", "--", "+"].includes(exp.operator)) {
+          this.setVariable(exp.left.value, BinaryNewValue, env, exp.left);
+        }
+
+
+        return BinaryNewValue;
+
+      case "AccessProp":
+        const ObjectItem = exp.value.object;
+        const ObjectName = ObjectItem.name;
+        const ObjectVar = env.get(exp.value.object.name);
+        if (!ObjectVar) new ImpalaError(`Object ${ObjectName} is not defined!`, null, this.createError(null, ObjectItem.index, ObjectItem.line));
+
+        const ObjectValue = ObjectVar.value;
+
+        let PropValue = ObjectVar;
+
+        for (const prop of exp.value.properties) {
+          if (!PropValue) new ImpalaError(`Cannot access property ${prop.value} of undefined object. Main object is ${ObjectName}`, null, this.createError(null, prop.index, prop.line));
+
+          if (PropValue.type !== "Object") new ImpalaError(`Cannot access property ${prop.value} of a ${PropValue.type || this.ToktoData[PropValue.type]}. Main object is ${ObjectName}.`, null, this.createError(null, prop.index, prop.line));
+          else {
+            PropValue = PropValue.value;
+          }
+          if (prop.type == "FunctionCall") {
+            const PropFunc = PropValue[prop.value.function.value.value];
+            this.interpret(PropFunc, env);
+            if (PropFunc.value) {
+              prop.value.function.value.value = PropFunc.value.varname.value;
+              PropValue = this.interpret(prop, env);
+            } else {
+              const args = prop.value.args.map((arg) => {
+                const argument = this.interpret(arg, env);
+                return argument;
+              });
+              PropValue = PropFunc.apply(null, args);
+            }
+
+            if (PropValue.type == "Return" && PropValue.returnType && PropValue.returnType != "Return") {
+              if (typeof PropValue.value == "Object")
+                PropValue.value.type = PropValue.returnType;
+              PropValue.type = PropValue.returnType;
+            }
+            continue;
+          }
+
+          PropValue = PropValue[prop.value];
+          if (PropValue && PropValue["__POSITIONALDATA__"]) {
+            delete PropValue["__POSITIONALDATA__"]
+          }
+        }
+
+        let AccessLastValue = this.interpret(PropValue, env);
+
+        if (AccessLastValue && AccessLastValue["__POSITIONALDATA__"]) {
+          delete AccessLastValue["__POSITIONALDATA__"];
+        }
+
+        return (AccessLastValue) ? AccessLastValue : PropValue;
 
       case "FunctionCall":
         // console.log(exp.value.function, env); // :LOG:
@@ -236,6 +400,22 @@ class Interpreter {
         // console.log("\n"); // :LOG:
 
         return func.apply(null, args);
+      
+      case "ForLoop":
+        let FVariable = this.interpret(exp.value.variable, env);
+        let forCondition = this.interpret(exp.value.canLoop, env);
+        
+        while (forCondition.value) {
+          const forBlock = this.interpret(exp.scope, env);
+          const forIteration = this.interpret(exp.value.iteration, env);
+          forCondition = this.interpret(exp.value.canLoop, env);
+
+          if (forBlock && (forBlock.type == "Return" || forBlock.type == "Break")) {
+            return forBlock;
+          }
+        }
+
+        return null;
 
       case "If":
         const ifCondition = this.interpret(exp.value.condition, env);
@@ -251,8 +431,13 @@ class Interpreter {
       case "Return":
         // console.log("RETURN:\n"); // :LOG:
         // console.log(exp, env); // :LOG:
-        const returnValue = this.interpret(exp.value, env);
-        const returnType = (exp.value.type == "Binary" || "Identifier") ? returnValue.type : (!exp.value.type) ? "Boolean" : exp.value.type;
+        let returnValue = (exp.type == "Return" && !exp.returnType) ? exp.value : (exp.type == "Return" && exp.returnType) ? exp : this.interpret(exp.value, env);
+        let returnType = (exp.value.type == "Binary" || exp.value.type == "Identifier") ? returnValue.type : (!exp.value.type) ? "Boolean" : exp.value.type;
+
+        if (exp.type == "Return" && exp.value && exp.value.type == "Binary") {
+          returnValue = this.interpret(exp.value, env);
+          returnType = returnValue.type;
+        }
 
         return { type: "Return", returnType, value: returnValue.value };
     }

@@ -9,7 +9,7 @@
   - [x]  Parse 'local and global variables'
   - [x]  Parse 'function calls'
     - Somewhat probably should fix a little bit
-  - [ ]  Parse 'for loops'
+  - [x]  Parse 'for loops'
   - [ ]  Parse 'while loops'
   - [x]  Parse 'if and else statements'
 - [ ]  Interpret or Compile data from parser
@@ -22,7 +22,7 @@
   - [x]  Interpret 'variable definitions'
   - [x]  Interpret 'variable reassignments'
   - [ ]  Interpret 'while loops'
-  - [ ]  Interpret 'for loops'
+  - [x]  Interpret 'for loops'
 
 #### Performance Increase
 
@@ -31,6 +31,16 @@ These things should be done after the language jam.
 
 - [ ]  Compile code down into bytecode
 - [ ]  Create vm in C++
-- [ ]  Create a working stack
 - [ ]  Parse all bytecode
 - [ ]  Run and interpret the bytecode
+
+or
+
+- [ ]  Compile code into assembly x86
+- [ ]  Compile and link assembly to an executable
+
+and
+
+- [ ]  Change how objects work (really slows down the language)
+- [ ]  Change the majority of the interpreter
+  - This should help developers and boost performance

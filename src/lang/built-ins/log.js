@@ -8,6 +8,5 @@ module.exports = {
         return item.value;
     });
     console.log.apply(null, args);
-
   }
 }
